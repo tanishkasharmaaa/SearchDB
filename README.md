@@ -7,6 +7,11 @@ Users can search for electronics (mobiles, laptops, accessories, headphones, gad
 
 ---
 
+## 🌐 Live Demo
+
+Check out the live deployed frontend here:  
+**[JumboTail Electronics Search Engine](https://search-db-seven.vercel.app/)**
+
 ## 📌 Features
 
 ### 1. Search Functionality

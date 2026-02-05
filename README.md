@@ -1,6 +1,5 @@
 
 
-````markdown
 # 🛒 JumboTail Electronics Search Engine
 
 A **search engine for an e-commerce platform** targeting Tier-2 and Tier-3 cities in India, built with the **MERN stack**.  
@@ -202,18 +201,3 @@ backend/
 
 ---
 
-```
-
-This version:  
-- Removes duplicates  
-- Uses consistent headings and emojis  
-- Consolidates setup instructions  
-- Makes code blocks clean  
-- Keeps all technical and functional details  
-
----
-
-If you want, I can also **add a small ASCII flow diagram** showing **Frontend → Backend → MongoDB → ProductList** so your README looks visually **professional and complete** for GitHub.  
-
-Do you want me to add that?
-```

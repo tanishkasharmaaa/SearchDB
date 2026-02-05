@@ -30,10 +30,6 @@ const ProductSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-/**
- * 🔥 TEXT INDEX
- * Title > Description > Metadata
- */
 ProductSchema.index(
   {
     title: "text",

@@ -11,7 +11,6 @@ module.exports = async function rankProducts(products, intent, query) {
       score += (p.rating || 0) * 2;
       score += Math.log((p.unitsSold || 1));
 
-      // 🔥 CLICK BOOST
       const boost = clickBoost[p._id.toString()] || 0;
       score += boost * 5;
 

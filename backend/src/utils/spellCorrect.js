@@ -22,12 +22,12 @@ function levenshtein(a, b) {
   return dp[a.length][b.length];
 }
 
-// ✅ Keep numbers like 128GB, 50k intact
+// Keep numbers like 128GB, 50k intact
 function isNumeric(token) {
   return /\d/.test(token);
 }
 
-// ✅ Correct a single token
+// Correct a single token
 function correctToken(token, dictionary) {
   const clean = token.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -52,7 +52,7 @@ function correctToken(token, dictionary) {
   return bestMatch;
 }
 
-// ✅ Correct all tokens in a query
+// Correct all tokens in a query
 function spellCorrectQuery(query, dictionary) {
   if (!query) return "";
 

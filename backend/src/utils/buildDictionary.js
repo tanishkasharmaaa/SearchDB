@@ -4,7 +4,6 @@ async function buildDictionary(Product) {
   const words = new Set();
 
   products.forEach(p => {
-    // 1️⃣ Extract words from title
     p.title
       .toLowerCase()
       .split(/\s+/)

@@ -6,7 +6,6 @@ const { faker } = require("@faker-js/faker");
 
 const MONGO_URI = process.env.MONGO_URI;
 
-// ---- CONFIG ----
 const TOTAL_PRODUCTS = 1200;
 
 const iphoneModels = [13, 14, 15, 16, 17];
@@ -127,7 +126,7 @@ async function seed() {
     }
 
     await Product.insertMany(products);
-    console.log(`✅ Inserted ${products.length} products`);
+    console.log(` Inserted ${products.length} products`);
 
     process.exit();
   } catch (err) {

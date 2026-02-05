@@ -1,3 +1,5 @@
+const productService = require("../services/product.service")
+
 exports.createProduct = async (req, res) => {
   try {
     const productId = await productService.createProduct(req.body);

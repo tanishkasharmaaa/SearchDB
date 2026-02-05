@@ -9,7 +9,7 @@ const SearchAnalyticsSchema = new mongoose.Schema({
   },
   position: Number,
   type: {
-    type: String, // "SEARCH" | "CLICK"
+    type: String,
     required: true
   },
   createdAt: {

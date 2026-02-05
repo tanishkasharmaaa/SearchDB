@@ -13,21 +13,18 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 👇 In-memory dictionary
+// In-memory dictionary
 global.DICTIONARY = [];
 
 async function startServer() {
   try {
-    // 1️⃣ Connect DB FIRST
     await connectDB();
     console.log("MongoDB connected");
 
-    // 2️⃣ Build dictionary AFTER DB connection
     global.DICTIONARY = await buildDictionary(Product);
     console.log("Dictionary size:", global.DICTIONARY.length);
     console.log("Contains iphone:", global.DICTIONARY.includes("iphone"));
 
-    // 3️⃣ Register routes
     app.use("/api/v1/product", productRoutes);
     app.use("/api/v1/search", searchRoutes);
 

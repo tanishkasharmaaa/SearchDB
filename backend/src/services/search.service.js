@@ -4,124 +4,241 @@ const { extractAttributes } = require("../utils/extractAttributes");
 const normalizeQuery = require("../utils/normalizeQuery");
 const cleanTextQuery = require("../utils/cleanTextQuery");
 
+const escapeRegex = (text) =>
+  text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 exports.search = async (rawQuery) => {
-  // 1️⃣ Normalize and spell-correct query
   const normalized = normalizeQuery(rawQuery);
   const correctedQuery = spellCorrectQuery(normalized, global.DICTIONARY);
 
-  // 2️⃣ Extract attributes (brand, color, storage, RAM, price, comparatives)
   const attributes = extractAttributes(correctedQuery);
-  console.log(attributes)
+  console.log(attributes);
 
-  // 3️⃣ Prepare text query for MongoDB $text search
   const textQuery = cleanTextQuery(correctedQuery);
 
-  // 4️⃣ Build MongoDB query (case-insensitive using regex for safety)
-  const mongoQuery = {};
+  const conditions = [];
 
-  // 🔹 Text search (only if exists)
+  // Text search
   if (textQuery.length > 0) {
-    mongoQuery.$text = { $search: textQuery };
+    conditions.push({ $text: { $search: textQuery } });
   }
 
-  // 🔹 Brand / Model
+  // Brand OR title match
   if (attributes.brand) {
-  mongoQuery.$or = [
-    { brand: { $regex: new RegExp(attributes.brand, "i") } },
-    { title: { $regex: new RegExp(attributes.brand, "i") } }
-  ];
-}
+    const safeBrand = escapeRegex(attributes.brand);
 
+    conditions.push({
+      $or: [
+        { brand: { $regex: safeBrand, $options: "i" } },
+        { title: { $regex: safeBrand, $options: "i" } }
+      ]
+    });
+  }
 
-  // 🔹 Color
+  // Title keywords
+  if (attributes.titleKeywords) {
+    const words = attributes.titleKeywords
+      .split(" ")
+      .map(w => escapeRegex(w))
+      .filter(Boolean);
+
+    if (words.length > 0) {
+      conditions.push({
+        title: {
+          $regex: words.join("|"),
+          $options: "i"
+        }
+      });
+    }
+  }
+
+  //  Color
   if (attributes.color) {
-    mongoQuery["metadata.color"] = { $regex: new RegExp(attributes.color, "i") };
+    const safeColor = escapeRegex(attributes.color);
+
+    conditions.push({
+      "metadata.color": { $regex: safeColor, $options: "i" }
+    });
   }
 
-  // 🔹 Storage
+  //  Storage
   if (attributes.storage) {
-  const storageValue = parseInt(attributes.storage.replace(/[^0-9]/g, ""));
-  if (!isNaN(storageValue)) {
-    mongoQuery["metadata.storage"] = storageValue; // ✅ numeric
+    const storageValue = parseInt(
+      attributes.storage.replace(/[^0-9]/g, "")
+    );
+
+    if (!isNaN(storageValue)) {
+      conditions.push({ "metadata.storage": storageValue });
+    }
   }
+
+  // RAM
+  if (attributes.ram) {
+    const ramValue = parseInt(
+      attributes.ram.replace(/[^0-9]/g, "")
+    );
+
+    if (!isNaN(ramValue)) {
+      conditions.push({ "metadata.ram": ramValue });
+    }
+  }
+
+  // Auto price intent detection
+  let autoPriceOrder = null;
+
+  if (!attributes.priceOrder) {
+    if (attributes.maxPrice && !attributes.minPrice) {
+      autoPriceOrder = "asc";
+    } else if (attributes.minPrice && !attributes.maxPrice) {
+      autoPriceOrder = "desc";
+    }
+  }
+
+  const mongoQuery =
+    conditions.length > 0 ? { $and: conditions } : {};
+
+    
+let mongoSort = {};
+
+if (attributes.priceOrder === "asc") {
+  mongoSort.price = 1;
+}
+else if (attributes.priceOrder === "desc") {
+  mongoSort.price = -1;
+}
+else if (attributes.minPrice && attributes.maxPrice) {
+  mongoSort.price = 1; 
+}
+else if (attributes.maxPrice && !attributes.minPrice) {
+  mongoSort.price = 1; 
+}
+else if (attributes.minPrice && !attributes.maxPrice) {
+  mongoSort.price = -1; 
+}
+else if (textQuery.length > 0) {
+  mongoSort = { score: { $meta: "textScore" } };
 }
 
-  // 🔹 RAM
- 
-if (attributes.ram) {
-  const ramValue = parseInt(attributes.ram.replace(/[^0-9]/g, ""));
-  if (!isNaN(ramValue)) {
-    mongoQuery["metadata.ram"] = ramValue; // ✅ numeric
+console.log("MONGO SORT:", mongoSort);
+
+
+let products = await Product.find(
+  mongoQuery,
+  textQuery.length > 0
+    ? { score: { $meta: "textScore" } }
+    : {}
+)
+.sort(mongoSort)
+.limit(300)
+.lean();
+
+  if (attributes.minPrice || attributes.maxPrice) {
+    products = products.filter(p => {
+      const price = Number(p.price);
+
+      if (!price || isNaN(price)) return false;
+
+      if (attributes.minPrice && price < attributes.minPrice)
+        return false;
+
+      if (attributes.maxPrice && price > attributes.maxPrice)
+        return false;
+
+      return true;
+    });
   }
-}
 
-  // 🔹 Price
-  if (attributes.price) {
-    mongoQuery.price = { $lte: attributes.price };
+
+  if ((!products || products.length === 0) && textQuery.length > 0) {
+    const safeText = escapeRegex(textQuery);
+
+    products = await Product.find({
+      title: { $regex: safeText, $options: "i" }
+    })
+      .lean();
   }
 
-  // 5️⃣ Fetch products from MongoDB
-  let products = await Product.find(
-    mongoQuery,
-    textQuery.length > 0 ? { score: { $meta: "textScore" } } : {}
-  ).limit(300);
-  console.log(products)
-
-  // 🔹 Fallback: regex on title if $text search + filters yield 0 results
-  if (!products || products.length === 0) {
-    let fallbackQuery = { title: { $regex: new RegExp(textQuery, "i") } };
-    if (attributes.brand) fallbackQuery.brand = { $regex: new RegExp(attributes.brand, "i") };
-    if (attributes.color) fallbackQuery["Metadata.color"] = { $regex: new RegExp(attributes.color, "i") };
-    products = await Product.find(fallbackQuery).limit(50);
-  }
-
-  // 6️⃣ Compute ranking score
+  //  Ranking
   products = products.map((p) => {
-    const textScore = p.score || 0;
-    const unitsSoldScore = Math.log((p.unitsSold || 1));
-    const ratingScore = (p.rating || 0) * 2;
-    const stockPenalty = p.stock <= 0 ? -5 : 0;
+    const textScore = (p.score || 1) * 3;
+
+    const popularityScore = Math.log(
+      (p.unitsSold || 1) + 1
+    );
+
+    const ratingScore =
+      (p.rating || 0) *
+      Math.log((p.ratingCount || 1) + 1);
+
+    let priceIntentScore = 0;
+
+    const finalPriceOrder =
+      attributes.priceOrder || autoPriceOrder;
+
+    if (finalPriceOrder === "asc") {
+      priceIntentScore = 100000 / (p.price || 1);
+    } else if (finalPriceOrder === "desc") {
+      priceIntentScore = (p.price || 0) / 10000;
+    }
+
+    const availabilityScore =
+      p.stock <= 0
+        ? -10
+        : Math.log((p.stock || 1) + 1);
+
+    const createdAt = p.createdAt
+      ? new Date(p.createdAt)
+      : new Date();
+
+    const ageInDays =
+      (Date.now() - createdAt) /
+      (1000 * 60 * 60 * 24);
+
+    const freshnessBoost =
+      ageInDays > 0 ? 5 / ageInDays : 5;
+
+    const finalScore =
+      textScore +
+      popularityScore +
+      ratingScore +
+      priceIntentScore +
+      availabilityScore +
+      freshnessBoost;
 
     return {
-      ...p.toObject(),
-      _score: textScore * 2 + ratingScore + unitsSoldScore + stockPenalty
+      ...p,
+      _score: finalScore
     };
   });
 
-  // 7️⃣ Apply comparatives sorting (price, storage, rating)
+
+const mongoSortedByPrice =
+  mongoSort.price !== undefined;
+
+if (!mongoSortedByPrice) {
   products.sort((a, b) => {
-    // 🔹 Price order (asc for sasta/cheap, desc for mehnga/expensive)
-    if (attributes.priceOrder) {
-      console.log(attributes.priceOrder,"-------")
-      const priceA = a.price;
-      const priceB = b.price;
-      return attributes.priceOrder === "asc" ? priceA - priceB : priceB - priceA;
-    }
 
-    // 🔹 Storage order (more storage first)
     if (attributes.storageOrder) {
-      const getStorageValue = (s) => {
-        if (!s) return 0;
-        const n = parseInt(s.replace(/[^0-9]/g, ""));
-        return isNaN(n) ? 0 : n;
-      };
-      const storageA = getStorageValue(a.Metadata?.storage);
-      const storageB = getStorageValue(b.Metadata?.storage);
-      return attributes.storageOrder === "desc" ? storageB - storageA : storageA - storageB;
+      return (b.metadata?.storage || 0) -
+             (a.metadata?.storage || 0);
     }
 
-    // 🔹 Rating order (high rating first)
     if (attributes.ratingOrder) {
       return (b.rating || 0) - (a.rating || 0);
     }
 
-    // 🔹 Default: sort by computed score (_score)
-    const scoreDiff = (b._score || 0) - (a._score || 0);
+    const scoreDiff =
+      (b._score || 0) - (a._score || 0);
+
     if (scoreDiff !== 0) return scoreDiff;
 
-    // 🔹 Final tiebreaker: productId
-    return a._id.toString().localeCompare(b._id.toString());
+    return a._id
+      .toString()
+      .localeCompare(b._id.toString());
   });
+}
+
+  console.log(products.map(p => p.price));
 
   return products;
 };

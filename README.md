@@ -76,13 +76,12 @@ Users can search for electronics (mobiles, laptops, accessories, headphones, gad
 ```bash
 cd backend
 npm install
-````
-
-2. Create `.env`:
+```
+2. Create `.env` :
 
 ```bash
 MONGO_URI=<Your MongoDB connection string>
-PORT=5000
+PORT=3000
 ```
 
 3. Run server:
@@ -91,7 +90,7 @@ PORT=5000
 npm run dev
 ```
 
-* API base: `http://localhost:5000/api/v1`
+* API base: `http://localhost:3000/api/v1`
 
 ### Frontend
 
@@ -102,10 +101,16 @@ cd frontend
 npm install
 ```
 
+2. Create `.env`:
+
+```bash
+VITE_BACKEND_URI=<Your Backend URL>
+```
+
 2. Run frontend:
 
 ```bash
-npm run dev
+npm start
 ```
 
 * App opens at: `http://localhost:5173` (Vite default)
